@@ -36,7 +36,7 @@ module.exports = {
 
             if (req.file) {
                 type = "file";
-                text = req.file.path; // Or you could map it to a specific URL path
+                text = req.file.path; 
             } else if (!text) {
                 return res.status(400).send({
                     success: false,
