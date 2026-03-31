@@ -10,39 +10,44 @@ router.use(CheckLogin);
 
 router.get('/', async function (req, res, next) {
     try {
-        let currentUserId = new mongoose.Types.ObjectId(req.user._id);
+        let currentUserId = req.user._id;
 
-        let messages = await messageModel.aggregate([
-            {
-                $match: {
-                    $or: [
-                        { from: currentUserId },
-                        { to: currentUserId }
-                    ]
-                }
-            },
-            { $sort: { createdAt: -1 } },
-            {
-                $group: {
-                    _id: {
-                        $cond: [
-                            { $eq: ["$from", currentUserId] },
-                            "$to",
-                            "$from"
-                        ]
-                    },
-                    lastMessage: { $first: "$$ROOT" }
-                }
-            },
-            { $replaceRoot: { newRoot: "$lastMessage" } },
-            { $sort: { createdAt: -1 } }
-        ]);
+        
+        let allMessages = await messageModel.find({
+            $or: [
+                { from: currentUserId },
+                { to: currentUserId }
+            ]
+        })
+        .sort({ createdAt: -1 }) 
+        .populate('from', 'username fullName avatarUrl')
+        .populate('to', 'username fullName avatarUrl');
 
-        await messageModel.populate(messages, { path: "from to", select: "username fullName avatarUrl" });
+        
+        let latestMessages = [];
+        let seenUsers = {}; 
+
+        for (let i = 0; i < allMessages.length; i++) {
+            let msg = allMessages[i];
+            
+        
+            let otherUserId = "";
+            if (msg.from._id.toString() === currentUserId.toString()) {
+                otherUserId = msg.to._id.toString(); 
+            } else {
+                otherUserId = msg.from._id.toString(); 
+            }
+
+           
+            if (!seenUsers[otherUserId]) {
+                seenUsers[otherUserId] = true; 
+                latestMessages.push(msg);      
+            }
+        }
 
         res.status(200).send({
             success: true,
-            data: messages
+            data: latestMessages
         });
     } catch (error) {
         res.status(500).send({
